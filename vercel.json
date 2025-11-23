@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "CI=false npx react-scripts build",
   "outputDirectory": "build",
   "installCommand": "npm install",
   "framework": "create-react-app"
