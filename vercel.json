@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "CI=false npx react-scripts build",
+  "buildCommand": "CI=false node ./node_modules/react-scripts/bin/react-scripts.js build",
   "outputDirectory": "build",
-  "installCommand": "npm install",
-  "framework": "create-react-app"
+  "installCommand": "npm install"
 }
