@@ -1,25 +1,7 @@
 {
   "version": 2,
-  "framework": "create-react-app",
-  "buildCommand": "CI=false npm run build",
-  "outputDirectory": "build",
-  "installCommand": "npm install",
-  "devCommand": "npm start",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/static/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ]
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/build",
+  "installCommand": "cd frontend && npm install",
+  "framework": null
 }
