@@ -13,7 +13,8 @@ const MerchantConfig = () => {
     apiVersion: '100',  // ← CHANGED
     currency: 'USD',
     merchantName: 'Test Merchant',
-    merchantUrl: 'https://example.com'
+    merchantUrl: 'https://example.com',
+    API_URL: config.API_URL  // ← ADDED: Backend API URL from config.js
   };
   
   const [config, setConfig] = useState(defaultConfig);
@@ -41,9 +42,9 @@ const MerchantConfig = () => {
 
   const handleSave = () => {
     // Validate required fields
-    if (!config.merchantId || !config.username || !config.password) {
+    if (!config.merchantId || !config.username || !config.password || !config.API_URL) {
       // ✅ REMOVED alert, using UI message instead
-      console.error('Please fill in all required fields');
+      console.error('Please fill in all required fields (Merchant ID, Username, Password, and Backend API URL)');
       return;
     }
 
@@ -96,7 +97,8 @@ const MerchantConfig = () => {
       apiVersion: '100',  // ← CHANGED
       currency: 'USD',
       merchantName: 'Test Merchant',
-      merchantUrl: 'https://example.com'
+      merchantUrl: 'https://example.com',
+      API_URL: config.API_URL  // ← ADDED: Backend API URL from config.js
     });
   };
 
@@ -125,6 +127,20 @@ const MerchantConfig = () => {
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Gateway Settings</h2>
           
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Backend API URL <span style={styles.required}>*</span></label>
+            <input
+              type="text"
+              name="API_URL"
+              value={config.API_URL}
+              onChange={handleChange}
+              placeholder="https://your-backend-api.vercel.app"
+              style={styles.input}
+              required
+            />
+            <p style={styles.hint}>URL of your backend Node.js server (e.g., Vercel deployment)</p>
+          </div>
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Gateway URL</label>
             <input
