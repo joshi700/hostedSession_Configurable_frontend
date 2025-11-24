@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 import ApiLogger from './ApiLogger';
 import apiLogManager from './utils/ApiLogManager';  // ← ADDED: Import ApiLogManager
+import config from './config';
 
 const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessionid, sendDataToParentorderId, sendDataToParenttrxid, onApiLog }) => {
   const cardNumberRef = useRef(null);
@@ -102,7 +103,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
         currency: config.currency
       };
 
-      const response = await axios.post('http://localhost:3001/create-session', requestData);
+      const response = await axios.post(`${config.API_URL}/create-session`, requestData);
       
       console.log('Session created:', response.data);
       
@@ -170,7 +171,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 1] Initiating authentication...');
-      const response = await axios.post('http://localhost:3001/api/initiate-authentication', requestData);
+      const response = await axios.post(`${config.API_URL}/api/initiate-authentication`, requestData);
       
       console.log('[STEP 1] Response:', response.data);
       
@@ -228,7 +229,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 2] Authenticating payer...');
-      const response = await axios.post('http://localhost:3001/api/authenticate-payer', requestData);
+      const response = await axios.post(`${config.API_URL}/api/authenticate-payer`, requestData);
       
       console.log('[STEP 2] Response:', response.data);
       
@@ -284,7 +285,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 3] Authorizing payment...');
-      const response = await axios.post('http://localhost:3001/api/authorize-pay', requestData);
+      const response = await axios.post(`${config.API_URL}/api/authorize-pay`, requestData);
       
       console.log('[STEP 3] Response:', response.data);
       
