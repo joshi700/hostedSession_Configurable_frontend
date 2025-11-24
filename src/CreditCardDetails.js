@@ -103,6 +103,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
         currency: config.currency
       };
 
+      // ✅ FIXED: Use config.API_URL (from merchantConfig) instead of imported config
       const response = await axios.post(`${config.API_URL}/create-session`, requestData);
       
       console.log('Session created:', response.data);
@@ -171,7 +172,8 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 1] Initiating authentication...');
-      const response = await axios.post(`${config.API_URL}/api/initiate-authentication`, requestData);
+      // ✅ FIXED: Use configToUse.API_URL instead of imported config
+      const response = await axios.post(`${configToUse.API_URL}/api/initiate-authentication`, requestData);
       
       console.log('[STEP 1] Response:', response.data);
       
@@ -229,7 +231,8 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 2] Authenticating payer...');
-      const response = await axios.post(`${config.API_URL}/api/authenticate-payer`, requestData);
+      // ✅ FIXED: Use configToUse.API_URL instead of imported config
+      const response = await axios.post(`${configToUse.API_URL}/api/authenticate-payer`, requestData);
       
       console.log('[STEP 2] Response:', response.data);
       
@@ -270,7 +273,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   };
 
   // ============================================
-  // 3DS FLOW - STEP 3: AUTHORIZE/PAY
+  // 3DS FLOW - STEP 3: AUTHORIZE PAYMENT
   // ============================================
   const authorizePay = async (sessionId, orderId, transactionId, configToUse) => {
     setProcessingStep('Step 3: Processing payment...');
@@ -281,11 +284,13 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
         merchantConfig: configToUse,
         sessionId,
         orderId,
-        transactionId
+        transactionId,
+        amount: message
       };
 
       console.log('[STEP 3] Authorizing payment...');
-      const response = await axios.post(`${config.API_URL}/api/authorize-pay`, requestData);
+      // ✅ FIXED: Use configToUse.API_URL instead of imported config
+      const response = await axios.post(`${configToUse.API_URL}/api/authorize-pay`, requestData);
       
       console.log('[STEP 3] Response:', response.data);
       
@@ -295,19 +300,20 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       }
 
       const result = response.data.result;
-      const gatewayCode = response.data.gatewayCode;
-
-      console.log('[STEP 3] Result:', result);
-      console.log('[STEP 3] Gateway Code:', gatewayCode);
-
-      setProcessingStep('');
+      console.log('[STEP 3] Payment Result:', result);
 
       if (result === 'SUCCESS') {
-        console.log('[STEP 3] Payment successful!');
-        // Handle success (e.g., redirect to receipt page)
+        console.log('[STEP 3] ✅ Payment successful!');
+        setProcessingStep('Payment successful! Redirecting...');
+        
+        // Navigate to receipt page after short delay
+        setTimeout(() => {
+          window.location.href = `/receipt?sessionId=${sessionId}&orderId=${orderId}&transactionId=${transactionId}`;
+        }, 1500);
       } else {
-        console.log('[STEP 3] Payment not successful:', result);
+        console.log('[STEP 3] ❌ Payment failed:', result);
         setError(`Payment failed: ${result}`);
+        setProcessingStep('');
       }
 
     } catch (error) {
@@ -323,132 +329,122 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
     }
   };
 
-  const initiateHostedSession = (sessionId, orderId, transactionId, config) => {
-    // Wait for DOM elements to be ready
-    const checkAndInitialize = (attempts = 0) => {
-      if (attempts > 20) {
-        console.error('Timeout waiting for DOM elements');
-        setError('Failed to initialize payment fields. Please refresh the page.');
-        setIsLoading(false);
-        return;
-      }
+  const initiateHostedSession = (sessionId, orderId, transactionId, configToUse) => {
+    if (!window.PaymentSession) {
+      console.error('PaymentSession not loaded');
+      return;
+    }
 
-      // Check if all required DOM elements exist
-      const cardNumber = document.getElementById('card-number');
-      const securityCode = document.getElementById('security-code');
-      const expiryMonth = document.getElementById('expiry-month');
-      const expiryYear = document.getElementById('expiry-year');
-      const cardholderName = document.getElementById('cardholder-name');
+    console.log('Configuring PaymentSession with:', {
+      sessionId,
+      merchantId: configToUse.merchantId
+    });
 
-      if (!cardNumber || !securityCode || !expiryMonth || !expiryYear || !cardholderName) {
-        console.log(`Attempt ${attempts + 1}: Waiting for DOM elements...`);
-        setTimeout(() => checkAndInitialize(attempts + 1), 100);
-        return;
-      }
-
-      // DOM elements are ready, now configure Payment Session
-      try {
-        if (!window.PaymentSession) {
-          console.error('PaymentSession not available');
-          setError('Payment Session not loaded. Please refresh the page.');
-          setIsLoading(false);
-          return;
-        }
-
-        console.log('✅ All DOM elements found, configuring Payment Session...');
-        console.log('Configuring Payment Session with session:', sessionId);
-        console.log('Using config:', config ? 'Present' : 'Missing');
-
-        window.PaymentSession.configure({
-          session: sessionId,
-          fields: {
-            card: {
-              number: "#card-number",
-              securityCode: "#security-code",
-              expiryMonth: "#expiry-month",
-              expiryYear: "#expiry-year",
-              nameOnCard: "#cardholder-name"
-            }
+    try {
+      window.PaymentSession.configure({
+        session: sessionId,
+        fields: {
+          card: {
+            number: "#card-number",
+            securityCode: "#security-code",
+            expiryMonth: "#expiry-month",
+            expiryYear: "#expiry-year",
+            nameOnCard: "#cardholder-name"
+          }
+        },
+        frameEmbeddingMitigation: ["javascript"],
+        callbacks: {
+          initialized: function(response) {
+            console.log('Session initialized:', response);
           },
-          frameEmbeddingMitigation: ["javascript"],
-          callbacks: {
-            initialized: function (response) {
-              console.log('Payment session initialized successfully:', response);
-              
-              if (response.status === 'system_error' || response.status === 'fields_in_error') {
-                console.error('Payment Session initialization error:', response);
-                setError(`Payment field error: ${response.message || 'Unknown error'}`);
-                setIsLoading(false);
-              }
-            },
-            formSessionUpdate: function (response) {
-              console.log('Form session updated, starting 3DS flow...', response);
-              
-              if (response.status === 'ok' && response.session) {
-                // Start the 3DS flow
-                initiateAuthentication(sessionId, orderId, transactionId, config);
-              } else if (response.status === 'system_error' || response.status === 'request_timeout') {
-                console.error('Form session update error:', response);
-                setError(`Session update failed: ${response.message || response.status}`);
-                setProcessingStep('');
+          formSessionUpdate: function(response) {
+            console.log('Form session updated:', response);
+            if (response.status) {
+              if (response.status === "ok") {
+                console.log('Session updated successfully, card data captured');
               } else {
-                console.error('Invalid form session update response:', response);
-                setError('Failed to update session. Please try again.');
-                setProcessingStep('');
+                console.error('Session update failed:', response);
               }
-            }
-          },
-          interaction: {
-            displayControl: {
-              formatCard: "EMBOSSED",
-              invalidFieldCharacters: "REJECT"
             }
           }
-        });
-      } catch (error) {
-        console.error('Error configuring Payment Session:', error);
-        setError('Failed to configure payment session. Please try again.');
-        setIsLoading(false);
-      }
-    };
+        },
+        interaction: {
+          displayControl: {
+            formatCard: "EMBOSSED",
+            invalidFieldCharacters: "REJECT"
+          }
+        }
+      });
 
-    // Start checking for DOM elements
-    checkAndInitialize();
-  };
-
-  const handlePayClicked = () => {
-    if (window.PaymentSession) {
-      window.PaymentSession.updateSessionFromForm('card');
-    } else {
-      setError('Payment session not initialized. Please refresh the page.');
+      console.log('PaymentSession configured successfully');
+    } catch (error) {
+      console.error('Error configuring PaymentSession:', error);
+      setError('Failed to initialize payment form. Please refresh and try again.');
     }
   };
 
-  // Loading state
-  if (isLoading) {
+  const handlePayClicked = async () => {
+    if (!window.PaymentSession) {
+      setError('Payment system not ready. Please refresh the page.');
+      return;
+    }
+
+    if (!merchantConfig) {
+      setError('Merchant configuration not loaded. Please refresh the page.');
+      return;
+    }
+
+    setProcessingStep('Updating payment session...');
+    setError(null);
+    
+    try {
+      // Step 1: Update the session with card details
+      console.log('Calling PaymentSession.updateSessionFromForm...');
+      
+      window.PaymentSession.updateSessionFromForm('card', (response) => {
+        console.log('updateSessionFromForm callback response:', response);
+        
+        if (response.status === 'ok') {
+          console.log('✅ Session updated successfully, starting 3DS flow...');
+          // Start 3DS authentication flow
+          initiateAuthentication(sessionId, orderId, transactionId, merchantConfig);
+        } else {
+          console.error('❌ Session update failed:', response);
+          setError(`Failed to capture card details: ${JSON.stringify(response)}`);
+          setProcessingStep('');
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error in handlePayClicked:', error);
+      setError(`Payment processing error: ${error.message}`);
+      setProcessingStep('');
+    }
+  };
+
+  if (isLoading && !merchantConfig) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
           <div style={styles.loadingContainer}>
             <div style={styles.spinner}></div>
-            <p style={styles.loadingText}>{processingStep || 'Initializing payment...'}</p>
+            <p style={styles.loadingText}>Loading payment session...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Error state
-  if (error && !sessionId) {
+  if (error && !merchantConfig) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
           <div style={styles.errorContainer}>
-            <h3 style={styles.errorTitle}>Configuration Error</h3>
+            <h2 style={styles.errorTitle}>Configuration Error</h2>
             <p style={styles.errorText}>{error}</p>
             <button 
               style={styles.configButton}
-              onClick={() => window.location.href = '/config'}
+              onClick={() => window.location.href = '/'}
             >
               Go to Configuration
             </button>
@@ -460,40 +456,43 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
 
   return (
     <div style={styles.wrapper}>
-      {/* Session Details */}
-      {sessionId && (
-        <div style={styles.sessionDetails}>
-          <h3 style={styles.sessionTitle}>Session Information</h3>
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Session ID:</span>
-            <code style={styles.detailValue}>{sessionId}</code>
-          </div>
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Order ID:</span>
-            <code style={styles.detailValue}>{orderId}</code>
-          </div>
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Transaction ID:</span>
-            <code style={styles.detailValue}>{transactionId}</code>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Form */}
       <div style={styles.container}>
-        {processingStep && (
-          <div style={styles.stepIndicator}>
-            {processingStep}
-          </div>
-        )}
-
         {error && (
           <div style={styles.errorBanner}>
             ⚠️ {error}
           </div>
         )}
 
-        <h2 style={styles.heading}>Payment Details</h2>
+        {processingStep && (
+          <div style={styles.stepIndicator}>
+            {processingStep}
+          </div>
+        )}
+
+        {/* Session Details */}
+        {sessionId && (
+          <div style={styles.sessionDetails}>
+            <h3 style={styles.sessionTitle}>Payment Session Details</h3>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Session ID:</span>
+              <span style={styles.detailValue}>{sessionId}</span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Order ID:</span>
+              <span style={styles.detailValue}>{orderId}</span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Transaction ID:</span>
+              <span style={styles.detailValue}>{transactionId}</span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Amount:</span>
+              <span style={styles.detailValue}>${message} {merchantConfig?.currency}</span>
+            </div>
+          </div>
+        )}
+
+        <h2 style={styles.heading}>Enter Payment Details</h2>
 
         <div style={styles.formGroup}>
           <label style={styles.label}>Card Number</label>
