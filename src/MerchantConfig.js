@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import config from './config';
+import appConfig from './config';
 const MerchantConfig = () => {
   const navigate = useNavigate();
   
@@ -14,7 +14,7 @@ const MerchantConfig = () => {
     currency: 'USD',
     merchantName: 'Test Merchant',
     merchantUrl: 'https://example.com',
-    API_URL: config.API_URL  // ← ADDED: Backend API URL from config.js
+    API_URL: appConfig.API_URL  // ← ADDED: Backend API URL from config.js
   };
   
   const [config, setConfig] = useState(defaultConfig);
@@ -98,7 +98,7 @@ const MerchantConfig = () => {
       currency: 'USD',
       merchantName: 'Test Merchant',
       merchantUrl: 'https://example.com',
-      API_URL: config.API_URL  // ← ADDED: Backend API URL from config.js
+      API_URL: appConfig.API_URL  // ← ADDED: Backend API URL from config.js
     });
   };
 
