@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import config from './config';
 const MerchantConfig = () => {
   const navigate = useNavigate();
   
@@ -68,7 +68,7 @@ const MerchantConfig = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/health');
+      const response = await fetch(`${config.API_URL}/health`);
       const data = await response.json();
       console.log(`✅ Backend connection successful! Status: ${data.status}`);
       // Could add UI notification here instead of alert
