@@ -160,6 +160,10 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   // 3DS FLOW - STEP 1: INITIATE AUTHENTICATION
   // ============================================
   const initiateAuthentication = async (sessionId, orderId, transactionId, configToUse) => {
+    console.log('=== STEP 1: INITIATE AUTHENTICATION ===');
+    console.log('Parameters:', { sessionId, orderId, transactionId });
+    console.log('Config API_URL:', configToUse.API_URL);
+    
     setProcessingStep('Step 1: Checking 3DS availability...');
     setCurrentStep(1);
     
@@ -172,10 +176,13 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 1] Initiating authentication...');
+      console.log('[STEP 1] Request URL:', `${configToUse.API_URL}/api/initiate-authentication`);
+      console.log('[STEP 1] Request data:', requestData);
+      
       // ✅ FIXED: Use configToUse.API_URL instead of imported config
       const response = await axios.post(`${configToUse.API_URL}/api/initiate-authentication`, requestData);
       
-      console.log('[STEP 1] Response:', response.data);
+      console.log('[STEP 1] Response received:', response.data);
       
       // ← UPDATED: Add API log to both state and ApiLogManager
       if (response.data.apiLog) {
@@ -201,7 +208,9 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       }
 
     } catch (error) {
-      console.error('[STEP 1] Error:', error);
+      console.error('[STEP 1] ERROR CAUGHT:', error);
+      console.error('[STEP 1] Error message:', error.message);
+      console.error('[STEP 1] Error response:', error.response);
       
       // ← UPDATED: Add error log to both state and ApiLogManager
       if (error.response?.data?.apiLog) {
@@ -217,6 +226,9 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   // 3DS FLOW - STEP 2: AUTHENTICATE PAYER
   // ============================================
   const authenticatePayer = async (sessionId, orderId, transactionId, configToUse) => {
+    console.log('=== STEP 2: AUTHENTICATE PAYER ===');
+    console.log('Parameters:', { sessionId, orderId, transactionId, amount: message });
+    
     setProcessingStep('Step 2: Authenticating payer...');
     setCurrentStep(2);
     
@@ -231,10 +243,13 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 2] Authenticating payer...');
+      console.log('[STEP 2] Request URL:', `${configToUse.API_URL}/api/authenticate-payer`);
+      console.log('[STEP 2] Request data:', requestData);
+      
       // ✅ FIXED: Use configToUse.API_URL instead of imported config
       const response = await axios.post(`${configToUse.API_URL}/api/authenticate-payer`, requestData);
       
-      console.log('[STEP 2] Response:', response.data);
+      console.log('[STEP 2] Response received:', response.data);
       
       // ← UPDATED: Add API log to both state and ApiLogManager
       if (response.data.apiLog) {
@@ -246,21 +261,26 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
 
       console.log('[STEP 2] Auth Status:', authStatus);
       console.log('[STEP 2] Has redirect HTML:', !!redirectHtml);
+      console.log('[STEP 2] HTML length:', redirectHtml ? redirectHtml.length : 0);
 
       if (redirectHtml) {
         console.log('[STEP 2] 3DS challenge required, showing authentication frame...');
+        console.log('[STEP 2] Calling sendDataToParent with HTML');
         sendDataToParent(redirectHtml);
         sendDataToParentsessionid(sessionId);
         sendDataToParentorderId(orderId);
         sendDataToParenttrxid(transactionId);
         setProcessingStep('Waiting for 3DS authentication...');
+        console.log('[STEP 2] Parent callbacks called, waiting for 3DS completion');
       } else {
         console.log('[STEP 2] No 3DS challenge needed, proceeding to payment...');
         await authorizePay(sessionId, orderId, transactionId, configToUse);
       }
 
     } catch (error) {
-      console.error('[STEP 2] Error:', error);
+      console.error('[STEP 2] ERROR CAUGHT:', error);
+      console.error('[STEP 2] Error message:', error.message);
+      console.error('[STEP 2] Error response:', error.response);
       
       // ← UPDATED: Add error log to both state and ApiLogManager
       if (error.response?.data?.apiLog) {
@@ -384,6 +404,13 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   };
 
   const handlePayClicked = async () => {
+    console.log('=== PAY BUTTON CLICKED ===');
+    console.log('PaymentSession available:', !!window.PaymentSession);
+    console.log('MerchantConfig:', merchantConfig);
+    console.log('SessionId:', sessionId);
+    console.log('OrderId:', orderId);
+    console.log('TransactionId:', transactionId);
+    
     if (!window.PaymentSession) {
       setError('Payment system not ready. Please refresh the page.');
       return;
@@ -402,10 +429,18 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       console.log('Calling PaymentSession.updateSessionFromForm...');
       
       window.PaymentSession.updateSessionFromForm('card', (response) => {
-        console.log('updateSessionFromForm callback response:', response);
+        console.log('=== UPDATE SESSION CALLBACK ===');
+        console.log('Callback response:', response);
+        console.log('Response status:', response.status);
         
         if (response.status === 'ok') {
           console.log('✅ Session updated successfully, starting 3DS flow...');
+          console.log('About to call initiateAuthentication with:', {
+            sessionId,
+            orderId,
+            transactionId,
+            API_URL: merchantConfig.API_URL
+          });
           // Start 3DS authentication flow
           initiateAuthentication(sessionId, orderId, transactionId, merchantConfig);
         } else {
