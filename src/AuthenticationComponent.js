@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import config from './config';
 
 const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorderID, htmlTrx, onApiLog }) => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -40,7 +41,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
         console.log('[3DS] Retrieving authentication status...');
         console.log('[3DS] Auth Transaction ID:', transactionId);
         
-        const response = await axios.post('http://localhost:3001/retrieve-transaction', {
+        const response = await axios.post(`${config.API_URL}/retrieve-transaction`, {
           merchantConfig,
           orderId,
           transactionId
@@ -63,7 +64,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           console.log('[3DS] Calling PAY endpoint...');
           console.log('[3DS] Using Auth Transaction ID:', transactionId);
           
-          const payResponse = await axios.post('http://localhost:3001/api/authorize-pay', {
+          const payResponse = await axios.post( `${config.API_URL}/api/authorize-pay`, {
             merchantConfig,
             sessionId,
             orderId,
