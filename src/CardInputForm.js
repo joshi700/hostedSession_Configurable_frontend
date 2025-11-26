@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import CreditCardDetails from "./CreditCardDetails";
@@ -8,9 +7,18 @@ var ssessionId = "";
 var oorderId = "";
 var ttransactionId = "";
 
-function CardInputForm({ message, sendDataToParent, sendDataToParentsessionID, sendDataToParentorderID, sendDataToParenttrxid }) {
+// ✅ FIXED: Added onApiLog prop
+function CardInputForm({ 
+  message, 
+  sendDataToParent, 
+  sendDataToParentsessionID, 
+  sendDataToParentorderID, 
+  sendDataToParenttrxid,
+  onApiLog  // ← ADDED: Now receiving onApiLog
+}) {
   const [showAuthComponent, setShowAuthComponent] = useState(0);
   const [Name, setName] = useState('');
+  
   const handleDataFromChild = (data) => {
     //setShowAuthComponent(1);
     sendDataToParent(data);
@@ -31,19 +39,30 @@ function CardInputForm({ message, sendDataToParent, sendDataToParentsessionID, s
     sendDataToParenttrxid(data);
   };
   
- return (
+  return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       
-      <h1 className="App" style={{ display: 'flex', flexDirection: 'column', width: '100%' , fontSize: '2rem', color: '#333'}} >Payment total is: {message} </h1>
+      <h1 className="App" style={{ display: 'flex', flexDirection: 'column', width: '100%' , fontSize: '2rem', color: '#333'}} >
+        Payment total is: {message}
+      </h1>
       
-      <CreditCardDetails message={message} sendDataToParent={handleDataFromChild} sendDataToParentsessionid={handleDataFromChildsessionid} sendDataToParentorderId={handleDataFromChildorderId}  sendDataToParenttrxid={handleDataFromChildtrxid}/>
+      <CreditCardDetails 
+        message={message} 
+        sendDataToParent={handleDataFromChild} 
+        sendDataToParentsessionid={handleDataFromChildsessionid} 
+        sendDataToParentorderId={handleDataFromChildorderId}  
+        sendDataToParenttrxid={handleDataFromChildtrxid}
+        onApiLog={onApiLog}  // ← ADDED: Now passing onApiLog to CreditCardDetails
+      />
       
     </div>
   );
 }
+
 const styles = {
-heading: {
-  
-},
+  heading: {
+    
+  },
 }
+
 export default CardInputForm;
