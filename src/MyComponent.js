@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CardInputForm from './CardInputForm';
 import AuthenticationComponent from './AuthenticationComponent';
@@ -17,21 +17,42 @@ const MyComponent = () => {
   const navigate = useNavigate();
   const data = location.state;
 
+  // ✅ FIXED: Handle all 3DS data at once to avoid race conditions
   const handleDataFromChild = (data) => {
-    setResponseHTML(String(data));
-    setShowAuthComponent(1);
-    setPaymentStatus(1);
+    console.log('[MyComponent] Received data from child:', typeof data);
+    
+    // Check if data is an object with all 3DS information
+    if (typeof data === 'object' && data.redirectHtml) {
+      console.log('[MyComponent] Received complete 3DS data structure');
+      setResponseHTML(String(data.redirectHtml));
+      setsessionId(String(data.sessionId));
+      setorderID(String(data.orderId));
+      settrxID(String(data.transactionId));
+      setShowAuthComponent(1);
+      setPaymentStatus(1);
+      console.log('[MyComponent] All 3DS data set, showing auth component');
+    } else {
+      // Fallback for legacy string format (if any)
+      console.log('[MyComponent] Received HTML string (legacy format)');
+      setResponseHTML(String(data));
+      setShowAuthComponent(1);
+      setPaymentStatus(1);
+    }
   };
 
+  // Legacy callbacks - kept for backward compatibility but not recommended
   const DataSessionID = (data1) => {
+    console.log('[MyComponent] Setting session ID:', data1);
     setsessionId(String(data1));
   };
 
   const DataOrderID = (data2) => {
+    console.log('[MyComponent] Setting order ID:', data2);
     setorderID(String(data2));
   };
 
   const handleDataFromChildTrxid = (data3) => {
+    console.log('[MyComponent] Setting transaction ID:', data3);
     settrxID(String(data3));
   };
 
@@ -42,6 +63,21 @@ const MyComponent = () => {
   const handleSettings = () => {
     navigate('/config');
   };
+
+  // ✅ ADDED: Debug logging to track state
+  useEffect(() => {
+    console.log('[MyComponent] State update:', {
+      showAuthComponent,
+      hasHTML: !!responseHTML,
+      htmlLength: responseHTML.length,
+      hasSessionId: !!sessionId,
+      sessionId: sessionId,
+      hasOrderID: !!orderID,
+      orderID: orderID,
+      hasTrxID: !!trxID,
+      trxID: trxID
+    });
+  }, [showAuthComponent, responseHTML, sessionId, orderID, trxID]);
 
   return (
     <div style={styles.pageContainer}>
