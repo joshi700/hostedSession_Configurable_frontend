@@ -265,13 +265,23 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
 
       if (redirectHtml) {
         console.log('[STEP 2] 3DS challenge required, showing authentication frame...');
-        console.log('[STEP 2] Calling sendDataToParent with HTML');
-        sendDataToParent(redirectHtml);
+        console.log('[STEP 2] Calling sendDataToParent with complete 3DS data');
+        
+        // ✅ FIXED: Pass all data at once to avoid race conditions
+        sendDataToParent({
+          redirectHtml: redirectHtml,
+          sessionId: sessionId,
+          orderId: orderId,
+          transactionId: transactionId
+        });
+        
+        // Still call individual callbacks for backward compatibility
         sendDataToParentsessionid(sessionId);
         sendDataToParentorderId(orderId);
         sendDataToParenttrxid(transactionId);
+        
         setProcessingStep('Waiting for 3DS authentication...');
-        console.log('[STEP 2] Parent callbacks called, waiting for 3DS completion');
+        console.log('[STEP 2] All 3DS data sent to parent, waiting for 3DS completion');
       } else {
         console.log('[STEP 2] No 3DS challenge needed, proceeding to payment...');
         await authorizePay(sessionId, orderId, transactionId, configToUse);
