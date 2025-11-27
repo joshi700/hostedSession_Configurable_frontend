@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ApiLogger from './ApiLogger';
 import apiLogManager from './utils/ApiLogManager';  // ← ADDED: Import ApiLogManager
-import config from './config';
 
 const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessionid, sendDataToParentorderId, sendDataToParenttrxid, onApiLog }) => {
+  const navigate = useNavigate();
   const cardNumberRef = useRef(null);
   const expiryMonthRef = useRef(null);
   const expiryYearRef = useRef(null);
@@ -103,8 +104,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
         currency: config.currency
       };
 
-      // ✅ FIXED: Use config.API_URL (from merchantConfig) instead of imported config
-      const response = await axios.post(`${config.API_URL}/create-session`, requestData);
+      const response = await axios.post('http://localhost:3001/create-session', requestData);
       
       console.log('Session created:', response.data);
       
@@ -160,10 +160,6 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   // 3DS FLOW - STEP 1: INITIATE AUTHENTICATION
   // ============================================
   const initiateAuthentication = async (sessionId, orderId, transactionId, configToUse) => {
-    console.log('=== STEP 1: INITIATE AUTHENTICATION ===');
-    console.log('Parameters:', { sessionId, orderId, transactionId });
-    console.log('Config API_URL:', configToUse.API_URL);
-    
     setProcessingStep('Step 1: Checking 3DS availability...');
     setCurrentStep(1);
     
@@ -176,13 +172,9 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 1] Initiating authentication...');
-      console.log('[STEP 1] Request URL:', `${configToUse.API_URL}/api/initiate-authentication`);
-      console.log('[STEP 1] Request data:', requestData);
+      const response = await axios.post('http://localhost:3001/api/initiate-authentication', requestData);
       
-      // ✅ FIXED: Use configToUse.API_URL instead of imported config
-      const response = await axios.post(`${configToUse.API_URL}/api/initiate-authentication`, requestData);
-      
-      console.log('[STEP 1] Response received:', response.data);
+      console.log('[STEP 1] Response:', response.data);
       
       // ← UPDATED: Add API log to both state and ApiLogManager
       if (response.data.apiLog) {
@@ -195,22 +187,28 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       console.log('[STEP 1] Auth Status:', authStatus);
       console.log('[STEP 1] Gateway Recommendation:', gatewayRecommendation);
 
-      // Check if we should proceed to Step 2 (Authenticate Payer)
-      if (authStatus === 'AUTHENTICATION_AVAILABLE' || gatewayRecommendation === 'PROCEED') {
-        console.log('[STEP 1] 3DS available, proceeding to authenticate payer...');
+      // ✅ FIXED: Check authentication status to determine next step
+      // ONLY proceed to AUTHENTICATE_PAYER if status is AUTHENTICATION_AVAILABLE
+      if (authStatus === 'AUTHENTICATION_AVAILABLE') {
+        console.log('[STEP 1] ✅ 3DS available, proceeding to authenticate payer (Step 2)...');
         await authenticatePayer(sessionId, orderId, transactionId, configToUse);
-      } else if (authStatus === 'AUTHENTICATION_NOT_AVAILABLE') {
-        console.log('[STEP 1] 3DS not available, skipping to payment...');
+      } else if (
+        authStatus === 'AUTHENTICATION_NOT_SUPPORTED' || 
+        authStatus === 'AUTHENTICATION_NOT_AVAILABLE' ||
+        authStatus === 'AUTHENTICATION_NOT_IN_EFFECT'
+      ) {
+        console.log('[STEP 1] ⏭️ 3DS not supported/available, skipping directly to payment (Step 3)...');
+        console.log('[STEP 1] Authentication Status:', authStatus);
         await authorizePay(sessionId, orderId, transactionId, configToUse);
       } else {
-        console.log('[STEP 1] Proceeding to Step 2 with status:', authStatus);
-        await authenticatePayer(sessionId, orderId, transactionId, configToUse);
+        // For any other status (FAILED, REJECTED, PENDING, etc.), show error
+        console.error('[STEP 1] ❌ Unexpected authentication status:', authStatus);
+        setProcessingStep('');
+        setError(`Authentication check failed with status: ${authStatus}. Please try again or contact support.`);
       }
 
     } catch (error) {
-      console.error('[STEP 1] ERROR CAUGHT:', error);
-      console.error('[STEP 1] Error message:', error.message);
-      console.error('[STEP 1] Error response:', error.response);
+      console.error('[STEP 1] Error:', error);
       
       // ← UPDATED: Add error log to both state and ApiLogManager
       if (error.response?.data?.apiLog) {
@@ -226,30 +224,40 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   // 3DS FLOW - STEP 2: AUTHENTICATE PAYER
   // ============================================
   const authenticatePayer = async (sessionId, orderId, transactionId, configToUse) => {
-    console.log('=== STEP 2: AUTHENTICATE PAYER ===');
-    console.log('Parameters:', { sessionId, orderId, transactionId, amount: message });
-    
     setProcessingStep('Step 2: Authenticating payer...');
     setCurrentStep(2);
     
     try {
+      // ✅ ADDED: Collect real browser details
+      const browserDetails = {
+        "3DSecureChallengeWindowSize": "FULL_SCREEN",
+        "acceptHeaders": "application/json",
+        "colorDepth": window.screen.colorDepth || 24,
+        "javaEnabled": navigator.javaEnabled ? navigator.javaEnabled() : false,
+        "language": navigator.language || "en-US",
+        "screenHeight": window.screen.height || 768,
+        "screenWidth": window.screen.width || 1024,
+        "timeZone": new Date().getTimezoneOffset()
+      };
+
       const requestData = {
         merchantConfig: configToUse,
         sessionId,
         orderId,
         transactionId,
         amount: message,
-        redirectResponseUrl: `${window.location.origin}/authentication-callback`
+        redirectResponseUrl: `${window.location.origin}/authentication-callback`,
+        // ✅ ADDED: Include device/browser details
+        device: {
+          browser: "MOZILLA",
+          browserDetails: browserDetails
+        }
       };
 
       console.log('[STEP 2] Authenticating payer...');
-      console.log('[STEP 2] Request URL:', `${configToUse.API_URL}/api/authenticate-payer`);
-      console.log('[STEP 2] Request data:', requestData);
+      const response = await axios.post('http://localhost:3001/api/authenticate-payer', requestData);
       
-      // ✅ FIXED: Use configToUse.API_URL instead of imported config
-      const response = await axios.post(`${configToUse.API_URL}/api/authenticate-payer`, requestData);
-      
-      console.log('[STEP 2] Response received:', response.data);
+      console.log('[STEP 2] Response:', response.data);
       
       // ← UPDATED: Add API log to both state and ApiLogManager
       if (response.data.apiLog) {
@@ -261,36 +269,21 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
 
       console.log('[STEP 2] Auth Status:', authStatus);
       console.log('[STEP 2] Has redirect HTML:', !!redirectHtml);
-      console.log('[STEP 2] HTML length:', redirectHtml ? redirectHtml.length : 0);
 
       if (redirectHtml) {
         console.log('[STEP 2] 3DS challenge required, showing authentication frame...');
-        console.log('[STEP 2] Calling sendDataToParent with complete 3DS data');
-        
-        // ✅ FIXED: Pass all data at once to avoid race conditions
-        sendDataToParent({
-          redirectHtml: redirectHtml,
-          sessionId: sessionId,
-          orderId: orderId,
-          transactionId: transactionId
-        });
-        
-        // Still call individual callbacks for backward compatibility
+        sendDataToParent(redirectHtml);
         sendDataToParentsessionid(sessionId);
         sendDataToParentorderId(orderId);
         sendDataToParenttrxid(transactionId);
-        
         setProcessingStep('Waiting for 3DS authentication...');
-        console.log('[STEP 2] All 3DS data sent to parent, waiting for 3DS completion');
       } else {
         console.log('[STEP 2] No 3DS challenge needed, proceeding to payment...');
         await authorizePay(sessionId, orderId, transactionId, configToUse);
       }
 
     } catch (error) {
-      console.error('[STEP 2] ERROR CAUGHT:', error);
-      console.error('[STEP 2] Error message:', error.message);
-      console.error('[STEP 2] Error response:', error.response);
+      console.error('[STEP 2] Error:', error);
       
       // ← UPDATED: Add error log to both state and ApiLogManager
       if (error.response?.data?.apiLog) {
@@ -303,7 +296,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
   };
 
   // ============================================
-  // 3DS FLOW - STEP 3: AUTHORIZE PAYMENT
+  // 3DS FLOW - STEP 3: AUTHORIZE/PAY
   // ============================================
   const authorizePay = async (sessionId, orderId, transactionId, configToUse) => {
     setProcessingStep('Step 3: Processing payment...');
@@ -314,13 +307,11 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
         merchantConfig: configToUse,
         sessionId,
         orderId,
-        transactionId,
-        amount: message
+        transactionId
       };
 
       console.log('[STEP 3] Authorizing payment...');
-      // ✅ FIXED: Use configToUse.API_URL instead of imported config
-      const response = await axios.post(`${configToUse.API_URL}/api/authorize-pay`, requestData);
+      const response = await axios.post('http://localhost:3001/api/authorize-pay', requestData);
       
       console.log('[STEP 3] Response:', response.data);
       
@@ -330,20 +321,33 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       }
 
       const result = response.data.result;
-      console.log('[STEP 3] Payment Result:', result);
+      const gatewayCode = response.data.gatewayCode;
+
+      console.log('[STEP 3] Result:', result);
+      console.log('[STEP 3] Gateway Code:', gatewayCode);
+
+      setProcessingStep('');
 
       if (result === 'SUCCESS') {
-        console.log('[STEP 3] ✅ Payment successful!');
-        setProcessingStep('Payment successful! Redirecting...');
+        console.log('[STEP 3] Payment successful!');
         
-        // Navigate to receipt page after short delay
-        setTimeout(() => {
-          window.location.href = `/receipt?sessionId=${sessionId}&orderId=${orderId}&transactionId=${transactionId}`;
-        }, 1500);
+        // ✅ FIXED: Navigate to receipt page with payment details
+        navigate('/receipt', {
+          state: {
+            orderid: orderId,
+            transactionid: response.data.transactionId,
+            orderstatus: result,
+            gatewaycode: gatewayCode,
+            gatewayrecommendation: response.data.gatewayRecommendation,
+            amount: response.data.amount,
+            currency: response.data.currency,
+            authenticationStatus: response.data.authenticationStatus,
+            fullResponse: response.data
+          }
+        });
       } else {
-        console.log('[STEP 3] ❌ Payment failed:', result);
+        console.log('[STEP 3] Payment not successful:', result);
         setError(`Payment failed: ${result}`);
-        setProcessingStep('');
       }
 
     } catch (error) {
@@ -359,137 +363,132 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
     }
   };
 
-  const initiateHostedSession = (sessionId, orderId, transactionId, configToUse) => {
-    if (!window.PaymentSession) {
-      console.error('PaymentSession not loaded');
-      return;
-    }
+  const initiateHostedSession = (sessionId, orderId, transactionId, config) => {
+    // Wait for DOM elements to be ready
+    const checkAndInitialize = (attempts = 0) => {
+      if (attempts > 20) {
+        console.error('Timeout waiting for DOM elements');
+        setError('Failed to initialize payment fields. Please refresh the page.');
+        setIsLoading(false);
+        return;
+      }
 
-    console.log('Configuring PaymentSession with:', {
-      sessionId,
-      merchantId: configToUse.merchantId
-    });
+      // Check if all required DOM elements exist
+      const cardNumber = document.getElementById('card-number');
+      const securityCode = document.getElementById('security-code');
+      const expiryMonth = document.getElementById('expiry-month');
+      const expiryYear = document.getElementById('expiry-year');
+      const cardholderName = document.getElementById('cardholder-name');
 
-    try {
-      window.PaymentSession.configure({
-        session: sessionId,
-        fields: {
-          card: {
-            number: "#card-number",
-            securityCode: "#security-code",
-            expiryMonth: "#expiry-month",
-            expiryYear: "#expiry-year",
-            nameOnCard: "#cardholder-name"
-          }
-        },
-        frameEmbeddingMitigation: ["javascript"],
-        callbacks: {
-          initialized: function(response) {
-            console.log('Session initialized:', response);
+      if (!cardNumber || !securityCode || !expiryMonth || !expiryYear || !cardholderName) {
+        console.log(`Attempt ${attempts + 1}: Waiting for DOM elements...`);
+        setTimeout(() => checkAndInitialize(attempts + 1), 100);
+        return;
+      }
+
+      // DOM elements are ready, now configure Payment Session
+      try {
+        if (!window.PaymentSession) {
+          console.error('PaymentSession not available');
+          setError('Payment Session not loaded. Please refresh the page.');
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('✅ All DOM elements found, configuring Payment Session...');
+        console.log('Configuring Payment Session with session:', sessionId);
+        console.log('Using config:', config ? 'Present' : 'Missing');
+
+        window.PaymentSession.configure({
+          session: sessionId,
+          fields: {
+            card: {
+              number: "#card-number",
+              securityCode: "#security-code",
+              expiryMonth: "#expiry-month",
+              expiryYear: "#expiry-year",
+              nameOnCard: "#cardholder-name"
+            }
           },
-          formSessionUpdate: function(response) {
-            console.log('Form session updated:', response);
-            if (response.status) {
-              if (response.status === "ok") {
-                console.log('Session updated successfully, card data captured');
+          frameEmbeddingMitigation: ["javascript"],
+          callbacks: {
+            initialized: function (response) {
+              console.log('Payment session initialized successfully:', response);
+              
+              if (response.status === 'system_error' || response.status === 'fields_in_error') {
+                console.error('Payment Session initialization error:', response);
+                setError(`Payment field error: ${response.message || 'Unknown error'}`);
+                setIsLoading(false);
+              }
+            },
+            formSessionUpdate: function (response) {
+              console.log('Form session updated, starting 3DS flow...', response);
+              
+              if (response.status === 'ok' && response.session) {
+                // Start the 3DS flow
+                initiateAuthentication(sessionId, orderId, transactionId, config);
+              } else if (response.status === 'system_error' || response.status === 'request_timeout') {
+                console.error('Form session update error:', response);
+                setError(`Session update failed: ${response.message || response.status}`);
+                setProcessingStep('');
               } else {
-                console.error('Session update failed:', response);
+                console.error('Invalid form session update response:', response);
+                setError('Failed to update session. Please try again.');
+                setProcessingStep('');
               }
             }
+          },
+          interaction: {
+            displayControl: {
+              formatCard: "EMBOSSED",
+              invalidFieldCharacters: "REJECT"
+            }
           }
-        },
-        interaction: {
-          displayControl: {
-            formatCard: "EMBOSSED",
-            invalidFieldCharacters: "REJECT"
-          }
-        }
-      });
+        });
+      } catch (error) {
+        console.error('Error configuring Payment Session:', error);
+        setError('Failed to configure payment session. Please try again.');
+        setIsLoading(false);
+      }
+    };
 
-      console.log('PaymentSession configured successfully');
-    } catch (error) {
-      console.error('Error configuring PaymentSession:', error);
-      setError('Failed to initialize payment form. Please refresh and try again.');
+    // Start checking for DOM elements
+    checkAndInitialize();
+  };
+
+  const handlePayClicked = () => {
+    if (window.PaymentSession) {
+      window.PaymentSession.updateSessionFromForm('card');
+    } else {
+      setError('Payment session not initialized. Please refresh the page.');
     }
   };
 
-  const handlePayClicked = async () => {
-    console.log('=== PAY BUTTON CLICKED ===');
-    console.log('PaymentSession available:', !!window.PaymentSession);
-    console.log('MerchantConfig:', merchantConfig);
-    console.log('SessionId:', sessionId);
-    console.log('OrderId:', orderId);
-    console.log('TransactionId:', transactionId);
-    
-    if (!window.PaymentSession) {
-      setError('Payment system not ready. Please refresh the page.');
-      return;
-    }
-
-    if (!merchantConfig) {
-      setError('Merchant configuration not loaded. Please refresh the page.');
-      return;
-    }
-
-    setProcessingStep('Updating payment session...');
-    setError(null);
-    
-    try {
-      // Step 1: Update the session with card details
-      console.log('Calling PaymentSession.updateSessionFromForm...');
-      
-      window.PaymentSession.updateSessionFromForm('card', (response) => {
-        console.log('=== UPDATE SESSION CALLBACK ===');
-        console.log('Callback response:', response);
-        console.log('Response status:', response.status);
-        
-        if (response.status === 'ok') {
-          console.log('✅ Session updated successfully, starting 3DS flow...');
-          console.log('About to call initiateAuthentication with:', {
-            sessionId,
-            orderId,
-            transactionId,
-            API_URL: merchantConfig.API_URL
-          });
-          // Start 3DS authentication flow
-          initiateAuthentication(sessionId, orderId, transactionId, merchantConfig);
-        } else {
-          console.error('❌ Session update failed:', response);
-          setError(`Failed to capture card details: ${JSON.stringify(response)}`);
-          setProcessingStep('');
-        }
-      });
-      
-    } catch (error) {
-      console.error('Error in handlePayClicked:', error);
-      setError(`Payment processing error: ${error.message}`);
-      setProcessingStep('');
-    }
-  };
-
-  if (isLoading && !merchantConfig) {
+  // Loading state
+  if (isLoading) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
           <div style={styles.loadingContainer}>
             <div style={styles.spinner}></div>
-            <p style={styles.loadingText}>Loading payment session...</p>
+            <p style={styles.loadingText}>{processingStep || 'Initializing payment...'}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (error && !merchantConfig) {
+  // Error state
+  if (error && !sessionId) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
           <div style={styles.errorContainer}>
-            <h2 style={styles.errorTitle}>Configuration Error</h2>
+            <h3 style={styles.errorTitle}>Configuration Error</h3>
             <p style={styles.errorText}>{error}</p>
             <button 
               style={styles.configButton}
-              onClick={() => window.location.href = '/'}
+              onClick={() => window.location.href = '/config'}
             >
               Go to Configuration
             </button>
@@ -501,43 +500,40 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
 
   return (
     <div style={styles.wrapper}>
-      <div style={styles.container}>
-        {error && (
-          <div style={styles.errorBanner}>
-            ⚠️ {error}
+      {/* Session Details */}
+      {sessionId && (
+        <div style={styles.sessionDetails}>
+          <h3 style={styles.sessionTitle}>Session Information</h3>
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>Session ID:</span>
+            <code style={styles.detailValue}>{sessionId}</code>
           </div>
-        )}
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>Order ID:</span>
+            <code style={styles.detailValue}>{orderId}</code>
+          </div>
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>Transaction ID:</span>
+            <code style={styles.detailValue}>{transactionId}</code>
+          </div>
+        </div>
+      )}
 
+      {/* Payment Form */}
+      <div style={styles.container}>
         {processingStep && (
           <div style={styles.stepIndicator}>
             {processingStep}
           </div>
         )}
 
-        {/* Session Details */}
-        {sessionId && (
-          <div style={styles.sessionDetails}>
-            <h3 style={styles.sessionTitle}>Payment Session Details</h3>
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Session ID:</span>
-              <span style={styles.detailValue}>{sessionId}</span>
-            </div>
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Order ID:</span>
-              <span style={styles.detailValue}>{orderId}</span>
-            </div>
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Transaction ID:</span>
-              <span style={styles.detailValue}>{transactionId}</span>
-            </div>
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Amount:</span>
-              <span style={styles.detailValue}>${message} {merchantConfig?.currency}</span>
-            </div>
+        {error && (
+          <div style={styles.errorBanner}>
+            ⚠️ {error}
           </div>
         )}
 
-        <h2 style={styles.heading}>Enter Payment Details</h2>
+        <h2 style={styles.heading}>Payment Details</h2>
 
         <div style={styles.formGroup}>
           <label style={styles.label}>Card Number</label>
