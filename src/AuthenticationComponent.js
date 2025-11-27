@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import config from './config';
 
 const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorderID, htmlTrx, onApiLog }) => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -41,7 +40,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
         console.log('[3DS] Retrieving authentication status...');
         console.log('[3DS] Auth Transaction ID:', transactionId);
         
-        const response = await axios.post(`${config.API_URL}/retrieve-transaction`, {
+        const response = await axios.post('http://localhost:3001/retrieve-transaction', {
           merchantConfig,
           orderId,
           transactionId
@@ -64,7 +63,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           console.log('[3DS] Calling PAY endpoint...');
           console.log('[3DS] Using Auth Transaction ID:', transactionId);
           
-          const payResponse = await axios.post( `${config.API_URL}/api/authorize-pay`, {
+          const payResponse = await axios.post('http://localhost:3001/api/authorize-pay', {
             merchantConfig,
             sessionId,
             orderId,
@@ -81,7 +80,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           setShowModal(false);
           
           // Navigate to receipt with PAYMENT transaction data
-          navigate('/Receipt', {
+          navigate('/receipt', {
             state: {
               orderid: orderId,
               transactionid: payResponse.data.transactionId,  // NEW payment transaction ID
@@ -104,7 +103,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           setError(errorMessage);
           
           // Navigate to receipt with error
-          navigate('/Receipt', {
+          navigate('/receipt', {
             state: {
               orderid: orderId,
               transactionid: transactionId,
@@ -147,7 +146,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
         setError(errorMessage);
         
         // Navigate to receipt with error
-        navigate('/Receipt', {
+        navigate('/receipt', {
           state: {
             orderid: sendDataToParentorderID,
             transactionid: htmlTrx,
