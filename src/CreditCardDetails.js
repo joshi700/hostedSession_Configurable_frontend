@@ -173,7 +173,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 1] Initiating authentication...');
-      const response = await axios.post(`${API_BASE_URL}/api/initiate-authentication', requestData);
+      const response = await axios.post(`${API_BASE_URL}/api/initiate-authentication`, requestData);
       
       console.log('[STEP 1] Response:', response.data);
       
@@ -256,7 +256,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 2] Authenticating payer...');
-      const response = await axios.post(`${API_BASE_URL}/api/authenticate-payer', requestData);
+      const response = await axios.post(`${API_BASE_URL}/api/authenticate-payer`, requestData);
       
       console.log('[STEP 2] Response:', response.data);
       
@@ -312,7 +312,7 @@ const CreditCardDetails = ({ message, sendDataToParent, sendDataToParentsessioni
       };
 
       console.log('[STEP 3] Authorizing payment...');
-      const response = await axios.post(`${API_BASE_URL}/api/authorize-pay', requestData);
+      const response = await axios.post(`${API_BASE_URL}/api/authorize-pay`, requestData)
       
       console.log('[STEP 3] Response:', response.data);
       
