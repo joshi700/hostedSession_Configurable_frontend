@@ -1,6 +1,10 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+// Use environment variable for API base URL with fallback for local development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorderID, htmlTrx, onApiLog }) => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -40,7 +44,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
         console.log('[3DS] Retrieving authentication status...');
         console.log('[3DS] Auth Transaction ID:', transactionId);
         
-        const response = await axios.post('http://localhost:3001/retrieve-transaction', {
+        const response = await axios.post(`${API_BASE_URL}/retrieve-transaction`, {
           merchantConfig,
           orderId,
           transactionId
@@ -63,7 +67,7 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           console.log('[3DS] Calling PAY endpoint...');
           console.log('[3DS] Using Auth Transaction ID:', transactionId);
           
-          const payResponse = await axios.post('http://localhost:3001/api/authorize-pay', {
+          const payResponse = await axios.post(`${API_BASE_URL}/api/authorize-pay`, {
             merchantConfig,
             sessionId,
             orderId,
@@ -130,22 +134,16 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
           onApiLog(error.response.data.apiLog);
         }
         
-        // Better error message
         let errorMessage = 'Failed to complete payment';
         if (error.response?.data?.details) {
           const details = error.response.data.details;
-          if (typeof details === 'object') {
-            errorMessage = details.error?.explanation || JSON.stringify(details);
-          } else {
-            errorMessage = details;
-          }
+          errorMessage = typeof details === 'object' ? details.error?.explanation || JSON.stringify(details) : details;
         } else if (error.message) {
           errorMessage = error.message;
         }
         
         setError(errorMessage);
         
-        // Navigate to receipt with error
         navigate('/receipt', {
           state: {
             orderid: sendDataToParentorderID,
@@ -184,13 +182,11 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
     <>
       {/* Modal Overlay */}
       <div style={styles.modalOverlay} onClick={(e) => {
-        // Only close if clicking the overlay itself, not the content
         if (e.target === e.currentTarget && !isProcessing) {
           handleCloseModal();
         }
       }}>
         <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-          {/* Header */}
           <div style={styles.modalHeader}>
             <h3 style={styles.title}>3D Secure Authentication</h3>
             {!isProcessing && (
@@ -204,14 +200,9 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
             )}
           </div>
           
-          <p style={styles.message}>
-            Please complete the authentication challenge below.
-          </p>
-          <p style={styles.submessage}>
-            The process will complete automatically after you verify your identity.
-          </p>
+          <p style={styles.message}>Please complete the authentication challenge below.</p>
+          <p style={styles.submessage}>The process will complete automatically after you verify your identity.</p>
           
-          {/* Error Display */}
           {error && (
             <div style={styles.errorContainer}>
               <span style={styles.errorIcon}>⚠️</span>
@@ -219,7 +210,6 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
             </div>
           )}
           
-          {/* 3DS Challenge iframe */}
           <div style={styles.iframeContainer}>
             <iframe 
               ref={iframeRef}
@@ -238,7 +228,6 @@ const AuthenticationComponent = ({ htmlContent, sessionId, sendDataToParentorder
         </div>
       </div>
       
-      {/* Add spinner animation */}
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
